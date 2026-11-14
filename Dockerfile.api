@@ -1,0 +1,21 @@
+# 1. Build the Angular app (output goes to API/wwwroot)
+FROM node:22 AS frontend
+WORKDIR /src/client
+COPY client/package*.json ./
+RUN npm ci
+COPY client/ ./
+RUN npx ng build --configuration production
+
+# 2. Build the .NET API and include the frontend
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+COPY . .
+COPY --from=frontend /src/API/wwwroot ./API/wwwroot
+RUN dotnet publish API/API.csproj -c Release -o /app/publish
+
+# 3. Runtime image
+FROM mcr.microsoft.com/dotnet/aspnet:9.0
+WORKDIR /app
+COPY --from=build /app/publish .
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "API.dll"]
